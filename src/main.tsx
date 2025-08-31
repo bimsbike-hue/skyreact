@@ -1,7 +1,7 @@
 // src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 
 import AppLayout from "./routes/AppLayout";
@@ -23,19 +23,33 @@ const GLOBAL_TRANSITION = {
   ease: [0.22, 1, 0.36, 1] as const,
 };
 
+// Simple 404 page
+function NotFound() {
+  return (
+    <div className="min-h-screen grid place-items-center bg-slate-900 text-slate-200">
+      <div className="text-center">
+        <h1 className="text-3xl font-semibold mb-2">404 – Page not found</h1>
+        <a href="/" className="text-blue-400 hover:underline">Go home</a>
+      </div>
+    </div>
+  );
+}
+
 const router = createBrowserRouter([
   {
-    element: <AppLayout />, // <-- Navbar lives here (so it shows on every page)
+    element: <AppLayout />,
+    errorElement: <NotFound />,
     children: [
       { path: "/", element: <Home /> },
       { path: "/login", element: <Login /> },
       { path: "/register", element: <Register /> },
+      { path: "/signup", element: <Navigate to="/register" replace /> }, // 👈 alias
 
       {
         path: "/dashboard",
         element: (
           <ProtectedRoute>
-            <DashboardLayout /> {/* only sidebar + <Outlet/>, no top navbar here */}
+            <DashboardLayout />
           </ProtectedRoute>
         ),
         children: [
@@ -46,6 +60,8 @@ const router = createBrowserRouter([
           { path: "profile", element: <Profile /> },
         ],
       },
+
+      { path: "*", element: <NotFound /> },
     ],
   },
 ]);

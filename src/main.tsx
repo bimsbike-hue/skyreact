@@ -1,77 +1,85 @@
 // src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
-import { MotionConfig } from "framer-motion";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import AppLayout from "./routes/AppLayout";
-import Home from "./routes/Home";
-import Login from "./routes/Login";
-import Register from "./routes/Register";
-import DashboardLayout from "./routes/DashboardLayout";
+import App from "./App";
+
+// Dashboard + nested pages
+import Dashboard from "./routes/Dashboard";
 import DashboardOverview from "./routes/DashboardOverview";
-import Orders from "./routes/Orders";
-import Subscriptions from "./routes/Subscriptions";
+import TopUpPage from "./routes/TopUp";
+import PurchaseHistory from "./routes/PurchaseHistory";
 import Profile from "./routes/Profile";
+
+// Admin pages (only if you have these files)
+import AdminPanel from "./routes/AdminPanel";
+import AdminPurchaseHistory from "./routes/AdminPurchaseHistory";
+
+// Auth pages
+import Login from "./routes/Login";
+// ⬇️ your Register lives under /routers (not /routes)
+import Register from "./routes/Register";
+
+// Auth provider / guard
 import ProtectedRoute from "./auth/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthProvider";
-import "./styles.css";
 
-// Smooth global animation
-const GLOBAL_TRANSITION = {
-  duration: 0.6,
-  ease: [0.22, 1, 0.36, 1] as const,
-};
-
-// Simple 404 page
-function NotFound() {
-  return (
-    <div className="min-h-screen grid place-items-center bg-slate-900 text-slate-200">
-      <div className="text-center">
-        <h1 className="text-3xl font-semibold mb-2">404 – Page not found</h1>
-        <a href="/" className="text-blue-400 hover:underline">Go home</a>
-      </div>
-    </div>
-  );
-}
-
-const router = createBrowserRouter([
-  {
-    element: <AppLayout />,
-    errorElement: <NotFound />,
-    children: [
-      { path: "/", element: <Home /> },
-      { path: "/login", element: <Login /> },
-      { path: "/register", element: <Register /> },
-      { path: "/signup", element: <Navigate to="/register" replace /> }, // 👈 alias
-
-      {
-        path: "/dashboard",
-        element: (
-          <ProtectedRoute>
-            <DashboardLayout />
-          </ProtectedRoute>
-        ),
-        children: [
-          { index: true, element: <DashboardOverview /> },
-          { path: "overview", element: <DashboardOverview /> },
-          { path: "orders", element: <Orders /> },
-          { path: "subscriptions", element: <Subscriptions /> },
-          { path: "profile", element: <Profile /> },
-        ],
-      },
-
-      { path: "*", element: <NotFound /> },
-    ],
-  },
-]);
+import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <MotionConfig transition={GLOBAL_TRANSITION} reducedMotion="user">
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
-    </MotionConfig>
+    <AuthProvider>
+      {/* The ONLY router in the app */}
+      <BrowserRouter>
+        <Routes>
+          {/* Public */}
+          <Route path="/" element={<App />} />
+          <Route path="/login" element={<Login />} />
+          {/* Keep /signup path so Login.tsx's Link to="/signup" works */}
+          <Route path="/signup" element={<Register />} />
+
+          {/* Private area */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          >
+            {/* default nested route */}
+            <Route index element={<Navigate to="overview" replace />} />
+
+            {/* user tabs */}
+            <Route path="overview" element={<DashboardOverview />} />
+            <Route path="topup" element={<TopUpPage />} />
+            <Route path="history" element={<PurchaseHistory />} />
+            <Route path="profile" element={<Profile />} />
+
+            {/* admin tabs (keep only pages you actually have) */}
+            <Route
+              path="admin"
+              element={
+                <ProtectedRoute adminOnly>
+                  <AdminPanel />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin-history"
+              element={
+                <ProtectedRoute adminOnly>
+                  <AdminPurchaseHistory />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+
+          {/* Catch-all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   </React.StrictMode>
 );

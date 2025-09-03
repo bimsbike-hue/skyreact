@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../lib/firebase";
+import { ensureUserDoc } from "../lib/wallet";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -13,9 +14,18 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      navigate("/dashboard"); // go to dashboard after signup
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const u = cred.user;
+
+      // immediately enrich user profile in Firestore
+      await ensureUserDoc(u.uid, {
+        email: u.email,
+        providerIds: u.providerData.map(p => p.providerId).filter(Boolean),
+      });
+
+      navigate("/dashboard");
     } catch (err: any) {
       setError(err?.message || "Failed to register.");
     }

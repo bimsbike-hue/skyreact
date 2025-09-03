@@ -1,133 +1,160 @@
+// src/components/Navbar.tsx
 import { useState } from "react";
-import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { getAuth, signOut } from "firebase/auth";
-import { app } from "../lib/firebase";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthProvider";
 
 export default function Navbar() {
-  const [open, setOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+  const { pathname } = useLocation();
+  const [open, setOpen] = useState(false);
 
-  const handleLogout = async () => {
+  const navLink =
+    "block px-3 py-2 rounded-md text-sm font-medium hover:text-indigo-300";
+  const isActive = (p: string) =>
+    pathname === p ? "text-white" : "text-slate-300";
+
+  async function handleLogout() {
     try {
-      await signOut(getAuth(app));
-      // if you were inside /dashboard, send the user home or to login
+      await logout();
+      setOpen(false);
       navigate("/login");
-    } catch (e) {
-      console.error("Logout failed:", e);
+    } catch (err) {
+      console.error("Logout failed:", err);
     }
-  };
+  }
 
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `px-3 py-2 rounded-md text-sm font-medium ${
-      isActive ? "text-white" : "text-slate-300 hover:text-white"
-    }`;
+  function closeMobile() {
+    setOpen(false);
+  }
 
   return (
-    <header className="sticky top-0 z-40 backdrop-blur bg-slate-900/80 border-b border-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <Link to="/" className="text-xl font-extrabold tracking-wider">
-          Sky3D
-        </Link>
+    <nav className="bg-slate-900 text-white sticky top-0 z-40 shadow">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="flex h-16 items-center justify-between">
+          {/* Brand */}
+          <Link to="/" className="text-xl font-bold" onClick={closeMobile}>
+            Sky3D
+          </Link>
 
-        {/* desktop nav */}
-        <nav className="hidden md:flex items-center gap-6">
-          <NavLink to="/" className={linkClass} end>
-            Home
-          </NavLink>
-          <NavLink
-            to={user ? "/dashboard/overview" : "/login"}
-            className={linkClass}
-          >
-            Dashboard
-          </NavLink>
-
-          {user ? (
-            <button
-              onClick={handleLogout}
-              className="ml-2 rounded-lg bg-slate-800 hover:bg-slate-700 px-4 py-2 text-sm font-semibold text-white"
-            >
-              Logout
-            </button>
-          ) : (
-            <Link
-              to="/login"
-              className="ml-2 rounded-lg bg-blue-600 hover:bg-blue-500 px-4 py-2 text-sm font-semibold text-white"
-            >
-              Login
-            </Link>
-          )}
-        </nav>
-
-        {/* mobile toggler */}
-        <button
-          className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700"
-          aria-label="Toggle menu"
-          onClick={() => setOpen((v) => !v)}
-        >
-          <span className="i-[hamburger]">
-            {/* simple bars */}
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M3 6h18M3 12h18M3 18h18" stroke="#e5e7eb" strokeWidth="2" />
-            </svg>
-          </span>
-        </button>
-      </div>
-
-      {/* mobile menu */}
-      {open && (
-        <div className="md:hidden border-t border-slate-800 bg-slate-900/95">
-          <div className="px-4 py-3 flex flex-col gap-2">
-            <NavLink
-              to="/"
-              className={({ isActive }) =>
-                `block rounded px-3 py-2 ${
-                  isActive && location.pathname === "/"
-                    ? "bg-slate-800 text-white"
-                    : "text-slate-300 hover:text-white"
-                }`
-              }
-              onClick={() => setOpen(false)}
-              end
-            >
+          {/* Desktop menu */}
+          <div className="hidden md:flex items-center space-x-6">
+            <Link to="/" className={`${navLink} ${isActive("/")}`}>
               Home
-            </NavLink>
-            <NavLink
-              to={user ? "/dashboard/overview" : "/login"}
-              className={({ isActive }) =>
-                `block rounded px-3 py-2 ${
-                  isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:text-white"
-                }`
-              }
-              onClick={() => setOpen(false)}
+            </Link>
+            <Link
+              to="/dashboard"
+              className={`${navLink} ${isActive("/dashboard")}`}
             >
               Dashboard
-            </NavLink>
+            </Link>
 
-            {user ? (
+            {!user ? (
+              <>
+                <Link
+                  to="/login"
+                  className={`${navLink} ${isActive("/login")}`}
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  className="px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 hover:bg-indigo-700"
+                >
+                  Sign Up
+                </Link>
+              </>
+            ) : (
               <button
-                onClick={() => {
-                  setOpen(false);
-                  handleLogout();
-                }}
-                className="mt-1 rounded bg-slate-800 hover:bg-slate-700 px-3 py-2 text-left text-slate-100"
+                onClick={handleLogout}
+                className="px-3 py-2 rounded-md text-sm font-medium bg-slate-700 hover:bg-slate-600"
               >
                 Logout
               </button>
+            )}
+          </div>
+
+          {/* Hamburger */}
+          <button
+            className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-slate-300 hover:text-white focus:outline-none"
+            aria-label="Toggle menu"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? (
+              // X
+              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
+                <path
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
             ) : (
-              <Link
-                to="/login"
-                onClick={() => setOpen(false)}
-                className="mt-1 rounded bg-blue-600 hover:bg-blue-500 px-3 py-2 text-left text-white"
+              // Bars
+              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none">
+                <path
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile drawer */}
+      {open && (
+        <div className="md:hidden border-t border-slate-800 bg-slate-900/95 backdrop-blur">
+          <div className="space-y-1 px-4 py-3">
+            <Link
+              to="/"
+              onClick={closeMobile}
+              className={`${navLink} ${isActive("/")}`}
+            >
+              Home
+            </Link>
+            <Link
+              to="/dashboard"
+              onClick={closeMobile}
+              className={`${navLink} ${isActive("/dashboard")}`}
+            >
+              Dashboard
+            </Link>
+
+            {!user ? (
+              <>
+                <Link
+                  to="/login"
+                  onClick={closeMobile}
+                  className={`${navLink} ${isActive("/login")}`}
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={closeMobile}
+                  className="block px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 hover:bg-indigo-700"
+                >
+                  Sign Up
+                </Link>
+              </>
+            ) : (
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-3 py-2 rounded-md text-sm font-medium bg-slate-700 hover:bg-slate-600"
               >
-                Login
-              </Link>
+                Logout
+              </button>
             )}
           </div>
         </div>
       )}
-    </header>
+    </nav>
   );
 }

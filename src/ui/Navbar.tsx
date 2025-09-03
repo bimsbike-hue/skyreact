@@ -4,11 +4,13 @@ import { getAuth, signOut } from "firebase/auth";
 import { app } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthProvider";
 import { AnimatePresence, motion } from "framer-motion";
+import { useWallet } from "../contexts/WalletProvider";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { balance } = useWallet();
 
   const handleLogout = async () => {
     await signOut(getAuth(app));
@@ -30,6 +32,7 @@ export default function Navbar() {
         {/* Desktop */}
         <nav className="hidden md:flex items-center gap-6">
           <NavLink to="/" className={linkClass} end>Home</NavLink>
+		  <NavLink to="/shop" className={linkClass}>Shop</NavLink>
           <NavLink to={user ? "/dashboard/overview" : "/login"} className={linkClass}>
             Dashboard
           </NavLink>
@@ -99,6 +102,7 @@ export default function Navbar() {
                 onClick={() => setOpen(false)}
                 className={linkClass}
               >
+			   <NavLink to="/shop" className={linkClass}>Shop</NavLink>
                 Dashboard
               </NavLink>
               {user ? (

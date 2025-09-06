@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { onWalletSnapshot, type FilamentBreakdown } from "../lib/wallet";
+import { useAuth } from "../contexts/AuthProvider";
 
 type WalletDoc = {
   hours?: number;
@@ -10,12 +11,14 @@ type WalletDoc = {
 };
 
 export default function DashboardWallet() {
+  const { user } = useAuth();
   const [wallet, setWallet] = useState<WalletDoc | null>(null);
 
   useEffect(() => {
-    const stop = onWalletSnapshot((w) => setWallet(w));
+    if (!user) return;
+    const stop = onWalletSnapshot(user.uid, (w) => setWallet(w));
     return () => stop();
-  }, []);
+  }, [user]);
 
   const hours = wallet?.hours ?? 0;
   const pla =

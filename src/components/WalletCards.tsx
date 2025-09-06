@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { onWalletSnapshot, type FilamentBreakdown } from "../lib/wallet";
+import { useAuth } from "../contexts/AuthProvider";
 
 type WalletDoc = {
   hours?: number;
@@ -10,19 +11,18 @@ type WalletDoc = {
 };
 
 export default function WalletCards() {
+  const { user } = useAuth();
   const [wallet, setWallet] = useState<WalletDoc | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // wallet.ts already figures out current user id internally? If not, pass uid here instead.
-    const stop = onWalletSnapshot(
-      (w) => {
-        setWallet(w);
-        setLoading(false);
-      }
-    );
+    if (!user) return;
+    const stop = onWalletSnapshot(user.uid, (w) => {
+      setWallet(w);
+      setLoading(false);
+    });
     return () => stop();
-  }, []);
+  }, [user]);
 
   const hours = wallet?.hours ?? 0;
 

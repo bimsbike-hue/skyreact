@@ -32,10 +32,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) {
-      setState((s) => ({ ...s, loading: false }));
+      setState({ hours: 0, filament: emptyBreakdown, loading: false });
       return;
     }
-    const stop = onWalletSnapshot((w) => {
+    const stop = onWalletSnapshot(user.uid, (w) => {
       setState({
         hours: w?.hours ?? 0,
         filament: w?.filament ?? emptyBreakdown,

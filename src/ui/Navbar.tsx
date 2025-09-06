@@ -1,16 +1,15 @@
+// src/ui/Navbar.tsx
 import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { getAuth, signOut } from "firebase/auth";
 import { app } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthProvider";
 import { AnimatePresence, motion } from "framer-motion";
-import { useWallet } from "../contexts/WalletProvider";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { balance } = useWallet();
 
   const handleLogout = async () => {
     await signOut(getAuth(app));
@@ -31,8 +30,12 @@ export default function Navbar() {
 
         {/* Desktop */}
         <nav className="hidden md:flex items-center gap-6">
-          <NavLink to="/" className={linkClass} end>Home</NavLink>
-		  <NavLink to="/shop" className={linkClass}>Shop</NavLink>
+          <NavLink to="/" className={linkClass} end>
+            Home
+          </NavLink>
+          <NavLink to="/shop" className={linkClass}>
+            Shop
+          </NavLink>
           <NavLink to={user ? "/dashboard/overview" : "/login"} className={linkClass}>
             Dashboard
           </NavLink>
@@ -59,23 +62,28 @@ export default function Navbar() {
           className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 transition"
           aria-label="Toggle menu"
         >
-          {/* simple animated burger */}
           <svg width="20" height="20" viewBox="0 0 24 24">
             <motion.path
               d="M3 6h18"
-              stroke="#e5e7eb" strokeWidth="2" strokeLinecap="round"
+              stroke="#e5e7eb"
+              strokeWidth="2"
+              strokeLinecap="round"
               animate={{ d: open ? "M6 6 L18 18" : "M3 6h18" }}
               transition={{ duration: 0.2 }}
             />
             <motion.path
               d="M3 12h18"
-              stroke="#e5e7eb" strokeWidth="2" strokeLinecap="round"
+              stroke="#e5e7eb"
+              strokeWidth="2"
+              strokeLinecap="round"
               animate={{ opacity: open ? 0 : 1 }}
               transition={{ duration: 0.2 }}
             />
             <motion.path
               d="M3 18h18"
-              stroke="#e5e7eb" strokeWidth="2" strokeLinecap="round"
+              stroke="#e5e7eb"
+              strokeWidth="2"
+              strokeLinecap="round"
               animate={{ d: open ? "M6 18 L18 6" : "M3 18h18" }}
               transition={{ duration: 0.2 }}
             />
@@ -97,17 +105,22 @@ export default function Navbar() {
               <NavLink to="/" onClick={() => setOpen(false)} className={linkClass} end>
                 Home
               </NavLink>
+              <NavLink to="/shop" onClick={() => setOpen(false)} className={linkClass}>
+                Shop
+              </NavLink>
               <NavLink
                 to={user ? "/dashboard/overview" : "/login"}
                 onClick={() => setOpen(false)}
                 className={linkClass}
               >
-			   <NavLink to="/shop" className={linkClass}>Shop</NavLink>
                 Dashboard
               </NavLink>
               {user ? (
                 <button
-                  onClick={() => { setOpen(false); handleLogout(); }}
+                  onClick={() => {
+                    setOpen(false);
+                    handleLogout();
+                  }}
                   className="mt-1 rounded bg-slate-800 hover:bg-slate-700 px-3 py-2 text-left text-slate-100 transition"
                 >
                   Logout

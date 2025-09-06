@@ -1,13 +1,16 @@
 // src/components/DashboardWallet.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { onWalletSnapshot, type FilamentBreakdown } from "../lib/wallet";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../contexts/AuthProvider";
+import { onWalletSnapshot } from "../lib/wallet";
 
 type WalletDoc = {
   hours?: number;
-  filament?: FilamentBreakdown;
+  filament?: {
+    PLA?: { White?: number; Black?: number; Gray?: number };
+    TPU?: { White?: number; Black?: number; Gray?: number };
+  };
 };
 
 export default function DashboardWallet() {
@@ -16,34 +19,37 @@ export default function DashboardWallet() {
 
   useEffect(() => {
     if (!user) return;
-    const stop = onWalletSnapshot(user.uid, (w) => setWallet(w));
+    const stop = onWalletSnapshot(user.uid, (w) => setWallet(w as WalletDoc | null));
     return () => stop();
   }, [user]);
 
-  const hours = wallet?.hours ?? 0;
-  const pla =
-    (wallet?.filament?.PLA?.White ?? 0) +
-    (wallet?.filament?.PLA?.Black ?? 0) +
-    (wallet?.filament?.PLA?.Gray ?? 0);
-  const tpu =
-    (wallet?.filament?.TPU?.White ?? 0) +
-    (wallet?.filament?.TPU?.Black ?? 0) +
-    (wallet?.filament?.TPU?.Gray ?? 0);
+  if (!user) return <p className="text-slate-300">Please sign in to see your wallet.</p>;
+  if (!wallet) return <p className="text-slate-300">Loading wallet…</p>;
+
+  const plaTotal = useMemo(() => {
+    const p = wallet.filament?.PLA || {};
+    return Number(p.White || 0) + Number(p.Black || 0) + Number(p.Gray || 0);
+  }, [wallet]);
+
+  const tpuTotal = useMemo(() => {
+    const t = wallet.filament?.TPU || {};
+    return Number(t.White || 0) + Number(t.Black || 0) + Number(t.Gray || 0);
+  }, [wallet]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <Box title="Hours Balance" value={`${hours}`} />
-      <Box title="PLA Balance" value={`${pla} g`} />
-      <Box title="TPU Balance" value={`${tpu} g`} />
-    </div>
-  );
-}
-
-function Box({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="p-4 rounded-2xl border border-slate-700/60 bg-slate-900/70">
-      <div className="text-slate-400 text-sm">{title}</div>
-      <div className="text-2xl font-bold text-white mt-1">{value}</div>
+      <div className="p-4 rounded-2xl shadow bg-slate-900/70 border border-slate-700/60">
+        <h3 className="text-sm text-slate-300">Hours Balance</h3>
+        <p className="text-2xl text-white font-semibold">{wallet.hours ?? 0}</p>
+      </div>
+      <div className="p-4 rounded-2xl shadow bg-slate-900/70 border border-slate-700/60">
+        <h3 className="text-sm text-slate-300">PLA (total grams)</h3>
+        <p className="text-2xl text-white font-semibold">{plaTotal}</p>
+      </div>
+      <div className="p-4 rounded-2xl shadow bg-slate-900/70 border border-slate-700/60">
+        <h3 className="text-sm text-slate-300">TPU (total grams)</h3>
+        <p className="text-2xl text-white font-semibold">{tpuTotal}</p>
+      </div>
     </div>
   );
 }

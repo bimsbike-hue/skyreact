@@ -1,65 +1,38 @@
-// src/contexts/AuthProvider.tsx
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { auth } from "../lib/firebase";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  GoogleAuthProvider,
-  signInWithPopup,
-  type User as FirebaseUser, // <-- type-only import (safe at runtime)
-} from "firebase/auth";
+// src/contexts/WalletProvider.tsx
+"use client";
 
-type AuthContextValue = {
-  user: FirebaseUser | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+import { createContext, useContext, useEffect, useState } from "react";
+import { onWalletSnapshot } from "../lib/wallet";
+import { useAuth } from "./AuthProvider";
+
+type WalletDoc = {
+  hours?: number;
+  filament?: {
+    PLA?: { White?: number; Black?: number; Gray?: number };
+    TPU?: { White?: number; Black?: number; Gray?: number };
+  };
 };
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+type WalletState = {
+  wallet: WalletDoc | null;
+};
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = useState(true);
+const Ctx = createContext<WalletState>({ wallet: null });
+
+export function WalletProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const [wallet, setWallet] = useState<WalletDoc | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-    });
-    return unsub;
-  }, []);
+    if (!user) {
+      setWallet(null);
+      return;
+    }
+    const stop = onWalletSnapshot(user.uid, (w) => setWallet(w as WalletDoc | null));
+    return () => stop();
+  }, [user]);
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      loading,
-      async login(email: string, password: string) {
-        await signInWithEmailAndPassword(auth, email, password);
-      },
-      async signup(email: string, password: string) {
-        await createUserWithEmailAndPassword(auth, email, password);
-      },
-      async logout() {
-        await signOut(auth);
-      },
-      async loginWithGoogle() {
-        const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
-      },
-    }),
-    [user, loading]
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <Ctx.Provider value={{ wallet }}>{children}</Ctx.Provider>;
 }
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider />");
-  return ctx;
-}
+export const useWallet = () => useContext(Ctx);

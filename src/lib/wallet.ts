@@ -17,7 +17,7 @@ import {
   onSnapshot,
   increment,
 } from "firebase/firestore";
-import { auth } from "./firebase";
+import { auth } from "../lib/firebase";
 
 /* =========================
    Types
@@ -37,25 +37,15 @@ export type TopUpRequest = {
   userId: string;
   userEmail?: string | null;
   userName?: string | null;
-
-  // hours top-up
   hours: number;
-
-  // Total price charged (IDR)
   amountIDR: number;
-
-  // NEW schema (multiple filament items)
-  items?: FilamentItem[];
-
-  // LEGACY single filament fields (still supported for old rows)
-  filament?: FilamentSelection;
-  material?: "PLA" | "TPU";
-  grams?: number;
-  color?: "White" | "Black" | "Gray";
-
+  items?: FilamentItem[]; // NEW schema
+  filament?: FilamentSelection; // legacy compat
+  material?: "PLA" | "TPU"; // legacy compat
+  grams?: number; // legacy compat
+  color?: "White" | "Black" | "Gray"; // legacy compat
   note?: string;
   status: TopUpStatus;
-
   createdAt: Date;
   approvedAt?: Date;
   approvedBy?: string;
@@ -97,8 +87,6 @@ const emptyBreakdown: FilamentBreakdown = {
 
 /* -------------------------------------------------
    Wallet doc resolution (backward compatible)
-   Tries to use an existing doc in order:
-   users/{uid}/wallet/{summary|snapshot|balances|default}
    ------------------------------------------------- */
 const WALLET_DOC_CANDIDATES = ["summary", "snapshot", "balances", "default"] as const;
 
@@ -108,7 +96,6 @@ async function resolveWalletDocId(uid: string): Promise<string> {
     const s = await getDoc(r);
     if (s.exists()) return id;
   }
-  // default to "summary" if none exists
   return "summary";
 }
 
@@ -164,12 +151,11 @@ export async function createTopUpRequest(
     userEmail?: string | null;
     userName?: string | null;
     hours: number;
-    // Multiple filament items (preferred). If omitted/empty, no filament.
-    items?: FilamentItem[];
+    items?: FilamentItem[]; // preferred
     amountIDR: number;
     note?: string;
 
-    // Back-compat: single filament fields (not used if items provided)
+    // legacy single filament (fallback)
     filament?: FilamentSelection;
     grams?: number;
     material?: "PLA" | "TPU";
@@ -189,9 +175,7 @@ export async function createTopUpRequest(
     createdAt: serverTimestamp(),
   };
 
-  // Prefer the new items[] schema
   if (payload.items && payload.items.length) {
-    // sanitize items
     body.items = payload.items
       .filter((it) => it && it.grams && it.material && it.color)
       .map((it) => ({
@@ -200,24 +184,17 @@ export async function createTopUpRequest(
         color: it.color,
       }));
   } else {
-    // Legacy single filament fallbacks (if provided)
     const single =
       payload.filament ||
       (payload.grams && payload.material && payload.color
-        ? {
-            grams: Number(payload.grams),
-            material: payload.material,
-            color: payload.color,
-          }
+        ? { grams: Number(payload.grams), material: payload.material, color: payload.color }
         : undefined);
-
     if (single) {
       body.filament = {
         material: single.material,
         grams: Number(single.grams || 0),
         color: single.color,
       };
-      // Also store flat fields (old admin list may read these)
       body.material = single.material;
       body.grams = Number(single.grams || 0);
       body.color = single.color;
@@ -248,16 +225,14 @@ const mapTopUp = (s: any): TopUpRequest => {
     rejectedBy: d.rejectedBy,
   };
 
-  // hydrate new items[]
   if (Array.isArray(d.items) && d.items.length) {
     row.items = d.items.map((it: any) => ({
-      material: it.material,
+      material: it.material as "PLA" | "TPU",
       grams: Number(it.grams || 0),
-      color: it.color,
+      color: it.color as "White" | "Black" | "Gray",
     }));
   }
 
-  // legacy single filament compat
   if (!row.items?.length) {
     const grams = Number(d.grams || d?.filament?.grams || 0);
     const material = (d.material || d?.filament?.material) as "PLA" | "TPU" | undefined;
@@ -294,8 +269,6 @@ export function onAllTopUpsHistory(cb: (rows: TopUpRequest[]) => void, max = 400
   const qy = query(collection(db, "topups"), orderBy("createdAt", "desc"), limit(max));
   return onSnapshot(qy, (snap) => cb(snap.docs.map(mapTopUp)));
 }
-
-// Back-compat alias for old code that imported onAllTopUps
 export const onAllTopUps = onAllTopUpsHistory;
 
 /* =========================
@@ -309,42 +282,39 @@ export async function adminApproveTopUp(topupId: string, approver: string) {
     if (!topSnap.exists()) throw new Error("Top-up not found");
 
     const t = topSnap.data() as any;
-    if (t.status === "approved") return; // idempotent
+    if (t.status === "approved") return;
 
     const uid: string = t.userId;
     const walletId = await ensureWallet(uid);
     const walletRef = doc(db, "users", uid, "wallet", walletId);
 
-    // Prepare wallet updates
     const updates: Record<string, any> = { updatedAt: serverTimestamp() };
 
-    // Hours
     const hoursInc = Number(t.hours || 0);
     if (hoursInc) updates["hours"] = increment(hoursInc);
 
-    // Filament (NEW items[])
     if (Array.isArray(t.items) && t.items.length) {
       (t.items as any[]).forEach((it: any) => {
-        if (it?.material && it?.color && it?.grams) {
-          updates[`filament.${it.material}.${it.color}`] = increment(Number(it.grams || 0));
+        const m = it?.material as "PLA" | "TPU" | undefined;
+        const c = it?.color as "White" | "Black" | "Gray" | undefined;
+        const g = Number(it?.grams || 0);
+        if (m && c && g) {
+          updates[`filament.${m}.${c}`] = increment(g);
         }
       });
     } else {
-      // Legacy single filament
-      const material: "PLA" | "TPU" | undefined = t.material ?? t?.filament?.material;
-      const grams: number = Number(t.grams ?? t?.filament?.grams ?? 0);
-      const color: "White" | "Black" | "Gray" | undefined = t.color ?? t?.filament?.color;
-      if (material && grams && color) {
-        updates[`filament.${material}.${color}`] = increment(grams);
+      const m = (t.material ?? t?.filament?.material) as "PLA" | "TPU" | undefined;
+      const c = (t.color ?? t?.filament?.color) as "White" | "Black" | "Gray" | undefined;
+      const g = Number(t.grams ?? t?.filament?.grams ?? 0);
+      if (m && c && g) {
+        updates[`filament.${m}.${c}`] = increment(g);
       }
     }
 
-    // Apply wallet updates if any
     if (Object.keys(updates).length > 1) {
       trx.update(walletRef, updates);
     }
 
-    // Mark approved + normalize legacy fields
     const patch: any = {
       status: "approved",
       approvedAt: serverTimestamp(),
@@ -390,8 +360,7 @@ export function onWalletSnapshot(uid: string, cb: (wallet: any | null) => void) 
 }
 
 /**
- * Primary source: approved topups grouped by material/color.
- * Fallback: wallet.filament if composite index is missing/building.
+ * Primary: sum approved topups; Fallback: wallet doc
  */
 export function onFilamentBreakdown(uid: string, cb: (b: FilamentBreakdown) => void) {
   let fallbackUsed = false;
@@ -404,7 +373,6 @@ export function onFilamentBreakdown(uid: string, cb: (b: FilamentBreakdown) => v
     limit(500)
   );
 
-  // Live fallback from wallet doc
   const stopWallet = onWalletSnapshot(uid, (w) => {
     if (fallbackUsed || !w) return;
     if (w.filament) {
@@ -434,30 +402,24 @@ export function onFilamentBreakdown(uid: string, cb: (b: FilamentBreakdown) => v
       snap.forEach((d) => {
         const v = d.data() as any;
 
-        // Prefer new items[]
         if (Array.isArray(v.items) && v.items.length) {
           (v.items as any[]).forEach((it: any) => {
-            if (it?.material && it?.color && it?.grams) {
-              acc[it.material as "PLA" | "TPU"][it.color as "White" | "Black" | "Gray"] += Number(
-                it.grams || 0
-              );
-            }
+            const m = it?.material as "PLA" | "TPU" | undefined;
+            const c = it?.color as "White" | "Black" | "Gray" | undefined;
+            const g = Number(it?.grams || 0);
+            if (m && c && g) acc[m][c] += g;
           });
         } else {
-          // legacy single fields
           const m = v.material as "PLA" | "TPU" | undefined;
           const c = v.color as "White" | "Black" | "Gray" | undefined;
           const g = Number(v.grams || v?.filament?.grams || 0);
-          if (m && c && g) {
-            acc[m][c] += g;
-          }
+          if (m && c && g) acc[m][c] += g;
         }
       });
 
       fallbackUsed = true;
       cb(acc);
     },
-    // If the composite index is missing/building, we'll silently use the wallet fallback.
     () => {}
   );
 

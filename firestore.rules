@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'bimsbike@gmail.com';
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Users collection and subcollections
+    match /users/{uid} {
+      // Allow user to read/write their own doc; admin can also read/write
+      allow read, write: if isSelf(uid) || isAdmin();
+
+      // Wallet snapshot
+      match /wallet/{docId} {
+        allow read, write: if isSelf(uid) || isAdmin();
+      }
+
+      // Optional wallet transactions (ledger)
+      match /wallet_tx/{txId} {
+        allow read: if isSelf(uid) || isAdmin();
+        allow create: if isSelf(uid) || isAdmin();
+      }
+
+      // Orders
+      match /orders/{orderId} {
+        allow read: if isSelf(uid) || isAdmin();
+      }
+    }
+
+    // Top-up requests live at /topups/{id}
+    match /topups/{topupId} {
+      // user can create a request for themselves
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid;
+
+      // user can read their own requests; admin can read all
+      allow read: if isAdmin()
+                  || (isSignedIn() && resource.data.userId == request.auth.uid);
+
+      // only admin can approve/reject (update/delete)
+      allow update, delete: if isAdmin();
+    }
+  }
+}

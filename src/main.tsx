@@ -11,14 +11,14 @@ import DashboardOverview from "./routes/DashboardOverview";
 import TopUpPage from "./routes/TopUp";
 import PurchaseHistory from "./routes/PurchaseHistory";
 import Profile from "./routes/Profile";
+import Payment from "./routes/Payment"; // ⬅️ NEW
 
-// Admin pages (only if you have these files)
+// Admin pages
 import AdminPanel from "./routes/AdminPanel";
 import AdminPurchaseHistory from "./routes/AdminPurchaseHistory";
 
 // Auth pages
 import Login from "./routes/Login";
-// ⬇️ your Register lives under /routers (not /routes)
 import Register from "./routes/Register";
 
 // Auth provider / guard
@@ -30,13 +30,11 @@ import "./index.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>
-      {/* The ONLY router in the app */}
       <BrowserRouter>
         <Routes>
           {/* Public */}
           <Route path="/" element={<App />} />
           <Route path="/login" element={<Login />} />
-          {/* Keep /signup path so Login.tsx's Link to="/signup" works */}
           <Route path="/signup" element={<Register />} />
 
           {/* Private area */}
@@ -57,7 +55,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="history" element={<PurchaseHistory />} />
             <Route path="profile" element={<Profile />} />
 
-            {/* admin tabs (keep only pages you actually have) */}
+            {/* payment info page */}
+            <Route path="payment" element={<Payment />} /> {/* ⬅️ NEW */}
+
+            {/* admin tabs */}
             <Route
               path="admin"
               element={

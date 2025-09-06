@@ -39,3 +39,4 @@ firebase-admin*.json
 *service-account*.json
 **/*-firebase-adminsdk-*.json
 firebase-admin*.json
+.vercel

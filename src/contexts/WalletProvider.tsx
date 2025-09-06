@@ -1,78 +1,53 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../lib/firebase";
-import {
-  onWalletSnapshot,
-  type WalletSnapshot,
-} from "../lib/wallet";
+// src/contexts/WalletProvider.tsx
+"use client";
 
-type WalletContextType = {
-  balance: number;                // hours
-  filament: { PLA: number; TPU: number }; // grams
+import { createContext, useContext, useEffect, useState } from "react";
+import { onWalletSnapshot, type FilamentBreakdown } from "../lib/wallet";
+import { useAuth } from "./AuthProvider";
+
+type WalletState = {
+  hours: number;
+  filament: FilamentBreakdown;
   loading: boolean;
-  refresh: () => Promise<void>;   // no-op (kept for API compatibility)
 };
 
-const WalletContext = createContext<WalletContextType>({
-  balance: 0,
-  filament: { PLA: 0, TPU: 0 },
+const emptyBreakdown: FilamentBreakdown = {
+  PLA: { White: 0, Black: 0, Gray: 0 },
+  TPU: { White: 0, Black: 0, Gray: 0 },
+};
+
+const Ctx = createContext<WalletState>({
+  hours: 0,
+  filament: emptyBreakdown,
   loading: true,
-  refresh: async () => {},
 });
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
-  const [loading, setLoading] = useState(true);
-  const [balance, setBalance] = useState(0);
-  const [filamentPLA, setFilamentPLA] = useState(0);
-  const [filamentTPU, setFilamentTPU] = useState(0);
+  const { user } = useAuth();
+  const [state, setState] = useState<WalletState>({
+    hours: 0,
+    filament: emptyBreakdown,
+    loading: true,
+  });
 
   useEffect(() => {
-    let unsubAuth = onAuthStateChanged(auth, (user) => {
-      // clean previous listener when user changes
-      let unsubWallet: (() => void) | undefined;
-
-      if (user) {
-        setLoading(true);
-        unsubWallet = onWalletSnapshot(
-          user.uid,
-          (w: WalletSnapshot) => {
-            setBalance(Number(w.hoursBalance ?? 0));
-            // Your schema has only filamentGrams; show it in PLA for now.
-            const grams = Number((w as any).filamentGrams ?? 0);
-            setFilamentPLA(grams);
-            setFilamentTPU(0); // until you add tpuGrams in schema
-            setLoading(false);
-          },
-          (e) => {
-            console.error("wallet snapshot error:", e);
-            setLoading(false);
-          }
-        );
-      } else {
-        setBalance(0);
-        setFilamentPLA(0);
-        setFilamentTPU(0);
-        setLoading(false);
-      }
-
-      return () => unsubWallet?.();
+    if (!user) {
+      setState((s) => ({ ...s, loading: false }));
+      return;
+    }
+    const stop = onWalletSnapshot((w) => {
+      setState({
+        hours: w?.hours ?? 0,
+        filament: w?.filament ?? emptyBreakdown,
+        loading: false,
+      });
     });
+    return () => stop();
+  }, [user]);
 
-    return () => unsubAuth();
-  }, []);
-
-  return (
-    <WalletContext.Provider
-      value={{
-        balance,
-        filament: { PLA: filamentPLA, TPU: filamentTPU },
-        loading,
-        refresh: async () => {}, // not needed with onSnapshot
-      }}
-    >
-      {children}
-    </WalletContext.Provider>
-  );
+  return <Ctx.Provider value={state}>{children}</Ctx.Provider>;
 }
 
-export const useWallet = () => useContext(WalletContext);
+export function useWallet() {
+  return useContext(Ctx);
+}

@@ -2,72 +2,63 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onWalletSnapshot, type WalletSnapshot } from "../lib/wallet";
-import { useAuth } from "../contexts/AuthProvider";
+import { onWalletSnapshot, type FilamentBreakdown } from "../lib/wallet";
+
+type WalletDoc = {
+  hours?: number;
+  filament?: FilamentBreakdown;
+};
 
 export default function WalletCards() {
-  const { user } = useAuth();
-  // only depend on a *stable primitive* (uid), not the whole user object
-  const uid = user?.uid ?? null;
-
-  const [wallet, setWallet] = useState<WalletSnapshot | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [wallet, setWallet] = useState<WalletDoc | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // when logging out, clear local state and don't subscribe
-    if (!uid) {
-      setWallet(null);
-      setError(null);
-      return;
-    }
-
-    // one subscription per uid, with proper cleanup
-    const unsub = onWalletSnapshot(
-      uid,
+    // wallet.ts already figures out current user id internally? If not, pass uid here instead.
+    const stop = onWalletSnapshot(
       (w) => {
-        setError(null);
         setWallet(w);
-      },
-      (e) => {
-        console.error("wallet listener error:", e);
-        setError("Failed to load wallet");
+        setLoading(false);
       }
     );
+    return () => stop();
+  }, []);
 
-    return () => unsub();
-  }, [uid]); // <— stable dependency
+  const hours = wallet?.hours ?? 0;
 
-  if (!uid) return null; // shouldn't render on public pages
+  const pla =
+    (wallet?.filament?.PLA?.White ?? 0) +
+    (wallet?.filament?.PLA?.Black ?? 0) +
+    (wallet?.filament?.PLA?.Gray ?? 0);
+
+  const tpu =
+    (wallet?.filament?.TPU?.White ?? 0) +
+    (wallet?.filament?.TPU?.Black ?? 0) +
+    (wallet?.filament?.TPU?.Gray ?? 0);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div className="p-4 rounded-xl shadow bg-white/5 border border-white/10">
-        <h3 className="font-semibold text-white/90">Hours Balance</h3>
-        <p className="mt-1 text-3xl text-white">
-          {wallet ? wallet.hoursBalance : "…"}
-        </p>
-        <p className="text-sm text-white/50">Usable for print jobs</p>
-      </div>
+      <Card title="Hours Balance" value={loading ? "…" : `${hours}`} subtitle="Usable for print jobs" />
+      <Card title="PLA Balance" value={loading ? "…" : `${pla} g`} subtitle="Filament stock" />
+      <Card title="TPU Balance" value={loading ? "…" : `${tpu} g`} subtitle="Filament stock" />
+    </div>
+  );
+}
 
-      <div className="p-4 rounded-xl shadow bg-white/5 border border-white/10">
-        <h3 className="font-semibold text-white/90">PLA Balance</h3>
-        <p className="mt-1 text-3xl text-white">
-          {wallet ? wallet.filamentGrams : "…"}
-        </p>
-        <p className="text-sm text-white/50">Filament stock</p>
-      </div>
-
-      <div className="p-4 rounded-xl shadow bg-white/5 border border-white/10">
-        <h3 className="font-semibold text-white/90">TPU Balance</h3>
-        <p className="mt-1 text-3xl text-white">0</p>
-        <p className="text-sm text-white/50">Filament stock</p>
-      </div>
-
-      {error && (
-        <div className="col-span-full rounded-lg bg-red-500/10 text-red-300 px-4 py-2">
-          {error}
-        </div>
-      )}
+function Card({
+  title,
+  value,
+  subtitle,
+}: {
+  title: string;
+  value: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 p-6 shadow-xl">
+      <div className="text-slate-400 text-sm">{title}</div>
+      <div className="mt-1 text-3xl font-extrabold text-white">{value}</div>
+      {subtitle && <div className="mt-1 text-slate-500 text-sm">{subtitle}</div>}
     </div>
   );
 }

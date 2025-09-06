@@ -1,0 +1,31 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+// src/routes/Register.tsx
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../lib/firebase";
+import { ensureUserDoc } from "../lib/wallet";
+export default function Register() {
+    const navigate = useNavigate();
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+        try {
+            const cred = await createUserWithEmailAndPassword(auth, email, password);
+            const u = cred.user;
+            // immediately enrich user profile in Firestore
+            await ensureUserDoc(u.uid, {
+                email: u.email,
+                providerIds: u.providerData.map(p => p.providerId).filter(Boolean),
+            });
+            navigate("/dashboard");
+        }
+        catch (err) {
+            setError(err?.message || "Failed to register.");
+        }
+    };
+    return (_jsx("div", { className: "flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-white", children: _jsxs("div", { className: "w-full max-w-md rounded-2xl bg-slate-900/70 p-8 shadow-xl", children: [_jsx("h1", { className: "mb-6 text-center text-2xl font-bold", children: "Create Account" }), error && (_jsx("p", { className: "mb-4 rounded bg-red-500/20 px-3 py-2 text-sm text-red-400", children: error })), _jsxs("form", { onSubmit: handleSubmit, className: "space-y-4", children: [_jsx("input", { type: "email", placeholder: "Email", value: email, onChange: (e) => setEmail(e.target.value), className: "w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-white focus:border-indigo-500 focus:outline-none", required: true }), _jsx("input", { type: "password", placeholder: "Password (min 6 chars)", value: password, onChange: (e) => setPassword(e.target.value), minLength: 6, className: "w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-white focus:border-indigo-500 focus:outline-none", required: true }), _jsx("button", { type: "submit", className: "w-full rounded-lg bg-indigo-600 px-4 py-2 font-semibold hover:bg-indigo-500 transition", children: "Sign Up" })] }), _jsxs("p", { className: "mt-4 text-center text-sm text-slate-400", children: ["Already have an account?", " ", _jsx(Link, { to: "/login", className: "text-indigo-400 hover:underline", children: "Login" })] })] }) }));
+}

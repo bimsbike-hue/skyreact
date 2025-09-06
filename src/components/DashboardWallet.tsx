@@ -1,67 +1,47 @@
+// src/components/DashboardWallet.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // adjust if your firebase init path differs
-import { useAuth } from "@/lib/useAuth"; // replace with your auth hook/context
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthProvider";
 
 type WalletSnapshot = {
-  userId: string;
-  hoursBalance: number;
-  plaGrams: number;
-  tpuGrams: number;
-  updatedAt: any; // Firestore timestamp
+  hours?: number;
+  hoursBalance?: number;
+  plaGrams?: number;
+  tpuGrams?: number;
 };
 
 export default function DashboardWallet() {
-  const { user } = useAuth(); // make sure this gives you the current Firebase user
+  const { user } = useAuth();
   const [wallet, setWallet] = useState<WalletSnapshot | null>(null);
 
   useEffect(() => {
     if (!user) return;
-
-    const ref = doc(db, "users", user.uid, "wallet", "default");
-
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data() as WalletSnapshot;
-          setWallet(data);
-        } else {
-          console.warn("wallet/default doc does not exist for user:", user.uid);
-          setWallet(null);
-        }
-      },
-      (err) => {
-        console.error("wallet listener error:", err);
-      }
-    );
-
-    return () => unsub();
+    const ref = doc(db, "users", user.uid, "wallet", "summary");
+    const stop = onSnapshot(ref, (snap) => {
+      setWallet((snap.data() as any) ?? null);
+    });
+    return () => stop();
   }, [user]);
 
-  if (!user) {
-    return <p>Please sign in to see your wallet.</p>;
-  }
-
-  if (!wallet) {
-    return <p>Loading wallet...</p>;
-  }
+  if (!user) return <p>Please sign in to see your wallet.</p>;
+  if (!wallet) return <p>Loading wallet...</p>;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div className="p-4 rounded-2xl shadow bg-white">
-        <h3 className="text-lg font-semibold">Hours Balance</h3>
-        <p className="text-2xl">{wallet.hoursBalance}</p>
+      <div className="p-4 rounded-2xl shadow bg-white/5 border border-white/10">
+        <h3 className="text-sm text-slate-300">Hours Balance</h3>
+        <p className="text-2xl text-white">{wallet.hoursBalance ?? wallet.hours ?? 0}</p>
       </div>
-      <div className="p-4 rounded-2xl shadow bg-white">
-        <h3 className="text-lg font-semibold">PLA Balance</h3>
-        <p className="text-2xl">{wallet.plaGrams}</p>
+      <div className="p-4 rounded-2xl shadow bg-white/5 border border-white/10">
+        <h3 className="text-sm text-slate-300">PLA Balance (g)</h3>
+        <p className="text-2xl text-white">{wallet.plaGrams ?? 0}</p>
       </div>
-      <div className="p-4 rounded-2xl shadow bg-white">
-        <h3 className="text-lg font-semibold">TPU Balance</h3>
-        <p className="text-2xl">{wallet.tpuGrams}</p>
+      <div className="p-4 rounded-2xl shadow bg-white/5 border border-white/10">
+        <h3 className="text-sm text-slate-300">TPU Balance (g)</h3>
+        <p className="text-2xl text-white">{wallet.tpuGrams ?? 0}</p>
       </div>
     </div>
   );

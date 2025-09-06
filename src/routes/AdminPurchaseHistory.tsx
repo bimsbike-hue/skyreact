@@ -1,116 +1,87 @@
-// src/routes/AdminPurchaseHistory.tsx
+// src/routes/AdminHistory.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  onAllTopUpsHistory,
-  type TopUpRequest,
-  formatIDR,
-} from "../lib/wallet";
+import { onAllTopUps, formatIDR, type TopUpRequest } from "../lib/wallet";
 
-function StatusBadge({ s }: { s: TopUpRequest["status"] }) {
-  const cls =
-    s === "approved"
-      ? "bg-emerald-600/30 text-emerald-300"
-      : s === "rejected"
-      ? "bg-rose-600/30 text-rose-300"
-      : "bg-amber-600/30 text-amber-300";
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs font-medium ${cls}`}>
-      {s}
-    </span>
-  );
-}
-
-function FilamentCell({ row }: { row: TopUpRequest }) {
-  // New schema: items[]
-  const items = (row as any).items as
-    | { material: "PLA" | "TPU"; grams: number; color: "White" | "Black" | "Gray" }[]
-    | undefined;
-
-  // Legacy single filament
-  const single = row.filament;
-
-  if (items && items.length > 0) {
-    return (
-      <div className="space-y-1">
-        {items.map((it, i) => (
-          <div key={i}>
-            {it.material} {it.grams}g ({it.color})
-            {i < items.length - 1 ? " +" : ""}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (single && single.grams) {
-    return (
-      <div>
-        {single.material} {single.grams}g ({single.color})
-      </div>
-    );
-  }
-
-  return <span className="text-slate-400">-</span>;
-}
-
-export default function AdminPurchaseHistory() {
+export default function AdminHistory() {
   const [rows, setRows] = useState<TopUpRequest[]>([]);
-  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const stop = onAllTopUpsHistory(setRows, 400);
-      return () => stop();
-    } catch (e: any) {
-      setErr(e?.message ?? String(e));
-    }
+    const stop = onAllTopUps(setRows, 500);
+    return () => stop();
   }, []);
+
+  const renderFilament = (r: TopUpRequest) => {
+    if (r.items && r.items.length) {
+      return r.items.map((it, i) => (
+        <div key={i}>
+          {it.material} {it.grams}g ({it.color}){i < r.items!.length - 1 ? " +" : ""}
+        </div>
+      ));
+    }
+    if (r.filament) {
+      return (
+        <div>
+          {r.filament.material} {r.filament.grams}g ({r.filament.color})
+        </div>
+      );
+    }
+    if (r.material && r.grams) {
+      return (
+        <div>
+          {r.material} {r.grams}g {r.color ? `(${r.color})` : ""}
+        </div>
+      );
+    }
+    return <span className="text-slate-400">-</span>;
+  };
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-bold text-white">Admin – All Purchases</h1>
-      {err && <div className="text-rose-400">Error: {err}</div>}
+      <h1 className="text-2xl font-bold text-white">User Purchase History</h1>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl">
+      <div className="overflow-x-auto rounded-xl border border-slate-700/60 bg-slate-900/70">
         <table className="min-w-full text-sm text-slate-200">
           <thead className="bg-slate-800/60 text-slate-300">
             <tr>
-              <th className="px-4 py-3 text-left">Created</th>
-              <th className="px-4 py-3 text-left">User</th>
-              <th className="px-4 py-3 text-left">Hours</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-slate-200 w-[40%]">Filament</th>
-              <th className="px-4 py-3 text-left">Amount</th>
-              <th className="px-4 py-3 text-left">Status</th>
+              <th className="px-4 py-2 text-left">Created</th>
+              <th className="px-4 py-2 text-left">User</th>
+              <th className="px-4 py-2 text-left">Hours</th>
+              <th className="px-4 py-2 text-left">Filament</th>
+              <th className="px-4 py-2 text-left">Amount</th>
+              <th className="px-4 py-2 text-left">Status</th>
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-6 text-slate-400">
-                  No purchases yet.
+            {rows.map((r) => (
+              <tr key={r.id} className="border-t border-slate-800 align-top">
+                <td className="px-4 py-3">{r.createdAt?.toLocaleString?.() ?? "-"}</td>
+                <td className="px-4 py-3">{r.userEmail || r.userName || r.userId}</td>
+                <td className="px-4 py-3">{r.hours || 0}</td>
+                <td className="px-4 py-3">{renderFilament(r)}</td>
+                <td className="px-4 py-3">{formatIDR(r.amountIDR || 0)}</td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`rounded px-2 py-1 text-xs ${
+                      r.status === "approved"
+                        ? "bg-green-500/20 text-green-300"
+                        : r.status === "pending"
+                        ? "bg-yellow-500/20 text-yellow-300"
+                        : "bg-rose-500/20 text-rose-300"
+                    }`}
+                  >
+                    {r.status}
+                  </span>
                 </td>
               </tr>
-            ) : (
-              rows.map((r) => (
-                <tr key={r.id} className="border-t border-slate-800 align-top">
-                  <td className="px-4 py-3">
-                    {r.createdAt ? r.createdAt.toLocaleString() : "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    {r.userEmail || r.userName || r.userId}
-                  </td>
-                  <td className="px-4 py-3">{r.hours || 0}</td>
-                  <td className="px-4 py-3">
-                    <FilamentCell row={r} />
-                  </td>
-                  <td className="px-4 py-3">{formatIDR(r.amountIDR || 0)}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge s={r.status} />
-                  </td>
-                </tr>
-              ))
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td className="px-4 py-6 text-slate-400" colSpan={6}>
+                  No data yet.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

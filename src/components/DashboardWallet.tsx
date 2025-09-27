@@ -1,67 +1,62 @@
+// src/components/DashboardWallet.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // adjust if your firebase init path differs
-import { useAuth } from "@/lib/useAuth"; // replace with your auth hook/context
+import { onWalletSnapshot } from "../lib/wallet";
+import { useAuth } from "../contexts/AuthProvider";
 
-type WalletSnapshot = {
-  userId: string;
+type WalletView = {
   hoursBalance: number;
   plaGrams: number;
   tpuGrams: number;
-  updatedAt: any; // Firestore timestamp
 };
 
 export default function DashboardWallet() {
-  const { user } = useAuth(); // make sure this gives you the current Firebase user
-  const [wallet, setWallet] = useState<WalletSnapshot | null>(null);
+  const { user } = useAuth();
+  const uid = user?.uid ?? null;
+
+  const [wallet, setWallet] = useState<WalletView>({
+    hoursBalance: 0,
+    plaGrams: 0,
+    tpuGrams: 0,
+  });
 
   useEffect(() => {
-    if (!user) return;
-
-    const ref = doc(db, "users", user.uid, "wallet", "default");
-
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data() as WalletSnapshot;
-          setWallet(data);
-        } else {
-          console.warn("wallet/default doc does not exist for user:", user.uid);
-          setWallet(null);
-        }
-      },
-      (err) => {
-        console.error("wallet listener error:", err);
-      }
-    );
-
+    if (!uid) {
+      setWallet({ hoursBalance: 0, plaGrams: 0, tpuGrams: 0 });
+      return;
+    }
+    const unsub = onWalletSnapshot(uid, (w) => {
+      setWallet({
+        hoursBalance: Number(w?.hoursBalance ?? 0),
+        // your schema currently exposes filamentGrams; fall back to plaGrams if present
+        plaGrams: Number((w as any)?.filamentGrams ?? (w as any)?.plaGrams ?? 0),
+        tpuGrams: Number((w as any)?.tpuGrams ?? 0),
+      });
+    });
     return () => unsub();
-  }, [user]);
+  }, [uid]);
 
-  if (!user) {
-    return <p>Please sign in to see your wallet.</p>;
-  }
-
-  if (!wallet) {
-    return <p>Loading wallet...</p>;
-  }
+  if (!uid) return null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div className="p-4 rounded-2xl shadow bg-white">
         <h3 className="text-lg font-semibold">Hours Balance</h3>
         <p className="text-2xl">{wallet.hoursBalance}</p>
+        <p className="text-sm text-slate-500">Usable for print jobs</p>
       </div>
+
       <div className="p-4 rounded-2xl shadow bg-white">
         <h3 className="text-lg font-semibold">PLA Balance</h3>
         <p className="text-2xl">{wallet.plaGrams}</p>
+        <p className="text-sm text-slate-500">Filament stock</p>
       </div>
+
       <div className="p-4 rounded-2xl shadow bg-white">
         <h3 className="text-lg font-semibold">TPU Balance</h3>
         <p className="text-2xl">{wallet.tpuGrams}</p>
+        <p className="text-sm text-slate-500">Filament stock</p>
       </div>
     </div>
   );

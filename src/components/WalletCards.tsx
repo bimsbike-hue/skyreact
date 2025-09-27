@@ -2,49 +2,42 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onWalletSnapshot, type WalletSnapshot } from "../lib/wallet";
+import { onWalletSnapshot } from "../lib/wallet";
 import { useAuth } from "../contexts/AuthProvider";
+
+// Minimal local shape; compatible with your wallet listener
+type WalletSnapshot = {
+  hoursBalance?: number;
+  filamentGrams?: number;
+  [key: string]: any;
+};
 
 export default function WalletCards() {
   const { user } = useAuth();
-  // only depend on a *stable primitive* (uid), not the whole user object
   const uid = user?.uid ?? null;
 
   const [wallet, setWallet] = useState<WalletSnapshot | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error] = useState<string | null>(null); // no error callback in onWalletSnapshot
 
   useEffect(() => {
-    // when logging out, clear local state and don't subscribe
     if (!uid) {
       setWallet(null);
-      setError(null);
       return;
     }
-
-    // one subscription per uid, with proper cleanup
-    const unsub = onWalletSnapshot(
-      uid,
-      (w) => {
-        setError(null);
-        setWallet(w);
-      },
-      (e) => {
-        console.error("wallet listener error:", e);
-        setError("Failed to load wallet");
-      }
-    );
-
+    const unsub = onWalletSnapshot(uid, (w) => {
+      setWallet(w || null);
+    });
     return () => unsub();
-  }, [uid]); // <— stable dependency
+  }, [uid]);
 
-  if (!uid) return null; // shouldn't render on public pages
+  if (!uid) return null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div className="p-4 rounded-xl shadow bg-white/5 border border-white/10">
         <h3 className="font-semibold text-white/90">Hours Balance</h3>
         <p className="mt-1 text-3xl text-white">
-          {wallet ? wallet.hoursBalance : "…"}
+          {wallet ? wallet.hoursBalance ?? 0 : "…"}
         </p>
         <p className="text-sm text-white/50">Usable for print jobs</p>
       </div>
@@ -52,7 +45,7 @@ export default function WalletCards() {
       <div className="p-4 rounded-xl shadow bg-white/5 border border-white/10">
         <h3 className="font-semibold text-white/90">PLA Balance</h3>
         <p className="mt-1 text-3xl text-white">
-          {wallet ? wallet.filamentGrams : "…"}
+          {wallet ? wallet.filamentGrams ?? 0 : "…"}
         </p>
         <p className="text-sm text-white/50">Filament stock</p>
       </div>

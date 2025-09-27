@@ -122,7 +122,7 @@ export default function CreateJobForm({ onCreated }: Props) {
             className="block w-full rounded border border-white/20 bg-white/5 p-2 file:mr-3 file:rounded file:border-0 file:bg-black file:text-white"
           />
           <span className="text-xs text-white/60">
-            Allowed: {allowed.replaceAll(",", ", ")}
+            Allowed: {allowed.split(",").join(", ")}
           </span>
         </label>
 

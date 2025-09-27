@@ -2,15 +2,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { onAllTopUps, TopUpRequest, formatIDR } from "../lib/wallet";
+import { onAllTopUpsHistory, formatIDR, type TopUpRequest } from "../lib/wallet";
 
 export default function AdminHistory() {
   const [rows, setRows] = useState<TopUpRequest[]>([]);
 
   useEffect(() => {
-    const unsub = onAllTopUps(setRows, 500);
+    const unsub = onAllTopUpsHistory(setRows, 500);
     return () => unsub();
   }, []);
+
+  function renderItems(r: TopUpRequest) {
+    if (!r.items || r.items.length === 0) return "—";
+    return r.items
+      .map((it) => `${it.material} ${it.grams}g (${it.color})`)
+      .join(", ");
+  }
 
   return (
     <section className="space-y-4">
@@ -31,18 +38,14 @@ export default function AdminHistory() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-slate-800">
-                <td className="px-4 py-3">{r.createdAt.toLocaleString()}</td>
+                <td className="px-4 py-3">
+                  {new Date(r.createdAt).toLocaleString()}
+                </td>
                 <td className="px-4 py-3">
                   {r.userEmail || r.userName || r.userId}
                 </td>
                 <td className="px-4 py-3">{r.hours || 0}</td>
-                <td className="px-4 py-3">
-                  {r.filament
-                    ? `${r.filament.material} ${r.filament.grams}g${
-                        r.filament.color ? ` (${r.filament.color})` : ""
-                      }`
-                    : "-"}
-                </td>
+                <td className="px-4 py-3">{renderItems(r)}</td>
                 <td className="px-4 py-3">{formatIDR(r.amountIDR)}</td>
                 <td className="px-4 py-3">
                   <span

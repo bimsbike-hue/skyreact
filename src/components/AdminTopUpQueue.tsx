@@ -1,9 +1,19 @@
+// src/components/AdminTopUpQueue.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import { onPendingTopUps, adminApproveTopUp, adminRejectTopUp, type TopUpRequest } from "../lib/wallet";
+import {
+  onPendingTopUps,
+  adminApproveTopUp,
+  adminRejectTopUp,
+  type TopUpRequest,
+} from "../lib/wallet";
 
-export default function AdminTopUpQueue({ adminIdOrEmail }: { adminIdOrEmail: string }) {
+export default function AdminTopUpQueue({
+  adminIdOrEmail,
+}: {
+  adminIdOrEmail: string;
+}) {
   const [rows, setRows] = useState<TopUpRequest[]>([]);
 
   useEffect(() => {
@@ -38,19 +48,37 @@ export default function AdminTopUpQueue({ adminIdOrEmail }: { adminIdOrEmail: st
             </tr>
           </thead>
           <tbody className="text-gray-100">
-            {rows.map(r => (
-              <tr key={r.id} className="border-t border-gray-700/60">
-                <td className="py-2 pr-4">{r.id.slice(0,8)}…</td>
-                <td className="py-2 pr-4">{r.userId}</td>
-                <td className="py-2 pr-4">{r.hours}</td>
-                <td className="py-2 pr-4">{r.grams}</td>
-                <td className="py-2 pr-4">Rp {r.amountIDR.toLocaleString("id-ID")}</td>
-                <td className="py-2 pr-4 flex gap-2">
-                  <button className="px-3 py-1 rounded bg-emerald-600" onClick={() => approve(r.id)}>Approve</button>
-                  <button className="px-3 py-1 rounded bg-rose-600" onClick={() => reject(r.id)}>Reject</button>
-                </td>
-              </tr>
-            ))}
+            {rows.map((r) => {
+              const grams =
+                (r as any).grams ??
+                ((r as any).filament?.grams as number | undefined) ??
+                0;
+              return (
+                <tr key={r.id} className="border-t border-gray-700/60">
+                  <td className="py-2 pr-4">{r.id.slice(0, 8)}…</td>
+                  <td className="py-2 pr-4">{r.userId}</td>
+                  <td className="py-2 pr-4">{r.hours ?? 0}</td>
+                  <td className="py-2 pr-4">{grams}</td>
+                  <td className="py-2 pr-4">
+                    Rp {r.amountIDR.toLocaleString("id-ID")}
+                  </td>
+                  <td className="py-2 pr-4 flex gap-2">
+                    <button
+                      className="px-3 py-1 rounded bg-emerald-600"
+                      onClick={() => approve(r.id)}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      className="px-3 py-1 rounded bg-rose-600"
+                      onClick={() => reject(r.id)}
+                    >
+                      Reject
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

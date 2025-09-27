@@ -89,7 +89,6 @@ const JOBS = "printJobs";
 /** Remove all undefined values so Firestore never sees them */
 function pruneUndefined<T>(value: T): T {
   if (Array.isArray(value)) {
-    // @ts-expect-error recursive
     return value.map(pruneUndefined) as any;
   }
   if (value !== null && typeof value === "object") {

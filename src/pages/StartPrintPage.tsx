@@ -403,10 +403,9 @@ export default function StartPrintPage() {
                   job.status === "approved" ||
                   job.status === "processing") && (
                   <StartPrintToolbar
-                    jobId={job.id!}
-                    currentStatus={job.status as any}
-                    onStatusChange={() => refresh()}
-                  />
+					jobId={job.id!}
+					onChanged={() => refresh()}
+					/>
                 )}
 
               {/* User message while waiting for quote */}

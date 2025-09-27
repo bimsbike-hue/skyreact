@@ -20,7 +20,7 @@ export default function TopUpForm() {
 
     setBusy(true);
     try {
-      const id = await createTopUpRequest(user.uid, { hours, grams, amountIDR: total, note });
+      const id = await createTopUpRequest(user.uid, { hours, amountIDR: total, note, grams } as any);
       alert(`Top-up submitted.\nID: ${id}\nPlease pay manually and include this ID; admin will approve.`);
       setHours(0); setGrams(0); setNote("");
     } catch (e:any) {

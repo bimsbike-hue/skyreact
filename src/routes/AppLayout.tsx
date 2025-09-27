@@ -8,10 +8,10 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-      {/* Single Navbar import */}
+      {/* Single top navbar across the app */}
       <Navbar />
 
-      {/* Page transition wrapper */}
+      {/* Page transitions */}
       <AnimatePresence mode="wait">
         <motion.main
           key={location.pathname}
@@ -19,7 +19,7 @@ export default function AppLayout() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+          className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8"
         >
           <Outlet />
         </motion.main>

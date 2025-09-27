@@ -1,121 +1,149 @@
 // src/routes/PurchaseHistory.tsx
-"use client";
+import React, { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthProvider";
+import { db } from "@/lib/firebase";
+import {
+  collection,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  startAfter,
+  where,
+  DocumentSnapshot,
+  Timestamp,
+} from "firebase/firestore";
+import Pager from "@/components/Pager";
 
-import { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
-import { db } from "../lib/firebase";
-import { useAuth } from "../contexts/AuthProvider";
-import { formatIDR } from "../lib/wallet";
-
-type TopUpRow = {
-  id: string;
+type Topup = {
+  id?: string;
   userId: string;
-  hours: number;
-  grams: number;
-  material?: string;
-  color?: string;
-  amountIDR: number;
-  status: "pending" | "approved" | "rejected";
-  createdAt?: any;
+  hours?: number;
+  grams?: number;
+  amount?: number; // legacy
+  amountIDR?: number; // new
+  status: "approved" | "pending" | "rejected";
+  createdAt?: Timestamp | { toDate: () => Date };
 };
+
+const PAGE_SIZE = 8;
+const fmtIDR = (n?: number) =>
+  typeof n === "number" ? `Rp ${n.toLocaleString("id-ID")}` : "-";
 
 export default function PurchaseHistory() {
   const { user } = useAuth();
-  const [rows, setRows] = useState<TopUpRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [rows, setRows] = useState<Topup[]>([]);
+  const [total, setTotal] = useState<number>(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [cursors, setCursors] = useState<(DocumentSnapshot | null)[]>([null]);
+
+  async function loadPage(p: number) {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const base = collection(db, "topups");
+      const baseQ = query(
+        base,
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(PAGE_SIZE + 1)
+      );
+      const cursor = cursors[p - 1] || null;
+      const qy = cursor ? query(baseQ, startAfter(cursor)) : baseQ;
+
+      const snap = await getDocs(qy);
+      const docs = snap.docs.slice(0, PAGE_SIZE);
+      const nextCursor = snap.docs.length > PAGE_SIZE ? snap.docs[PAGE_SIZE - 1] : null;
+
+      setRows(docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+
+      const newCursors = [...cursors];
+      if (!newCursors[p]) newCursors[p] = docs[docs.length - 1] || newCursors[p - 1] || null;
+      if (nextCursor && !newCursors[p + 1]) newCursors[p + 1] = nextCursor;
+      setCursors(newCursors);
+
+      setTotal((p - 1) * PAGE_SIZE + docs.length + (nextCursor ? PAGE_SIZE : 0));
+      setPage(p);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    if (!user) return;
+    loadPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid]);
 
-    // Requires index: userId + createdAt(desc)
-    const col = collection(db, "topups");
-    const qy = query(col, where("userId", "==", user.uid), orderBy("createdAt", "desc"));
+  function formatDate(v: any) {
+    try {
+      const d =
+        v instanceof Timestamp ? v.toDate() : typeof v?.toDate === "function" ? v.toDate() : new Date(v);
+      return d.toLocaleString();
+    } catch {
+      return "";
+    }
+  }
 
-    const unsub = onSnapshot(
-      qy,
-      (snap) => {
-        const list: TopUpRow[] = [];
-        snap.forEach((d) => {
-          const x = d.data() as any;
-          list.push({
-            id: d.id,
-            userId: x.userId,
-            hours: Number(x.hours || 0),
-            grams: Number(x.grams || 0),
-            material: x.material,
-            color: x.color,
-            amountIDR: Number(x.amountIDR || 0),
-            status: x.status,
-            createdAt: x.createdAt
-          });
-        });
-        setRows(list);
-        setError(null);
-      },
-      (e) => setError(e.message || "Failed to load history")
-    );
-    return () => unsub();
-  }, [user]);
+  const card =
+    "rounded-2xl ring-1 ring-white/10 bg-white/5 p-5 backdrop-blur-sm shadow-xl shadow-black/10";
 
   return (
-    <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-700/60">
-        <h3 className="text-lg font-semibold text-white">Purchase History</h3>
-      </div>
-      <div className="p-6">
-        {error ? (
-          <div className="text-red-400 text-sm">{error}</div>
-        ) : rows.length === 0 ? (
-          <div className="text-slate-400">No purchases yet.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="py-2 pr-4">Created</th>
-                  <th className="py-2 pr-4">Hours</th>
-                  <th className="py-2 pr-4">Filament</th>
-                  <th className="py-2 pr-4">Amount</th>
-                  <th className="py-2 pr-4">Status</th>
+    <div className="space-y-4">
+      <header>
+        <h1 className="text-xl font-semibold text-white">Purchase History</h1>
+        <p className="text-slate-400 text-sm">Your submitted top-ups and their statuses.</p>
+      </header>
+
+      <div className={card}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-300">
+                <th className="py-2">Created</th>
+                <th className="py-2">Hours</th>
+                <th className="py-2">Filament (g)</th>
+                <th className="py-2">Amount</th>
+                <th className="py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-200">
+              {rows.map((r) => (
+                <tr key={r.id} className="border-t border-white/5">
+                  <td className="py-2">{formatDate(r.createdAt)}</td>
+                  <td className="py-2 tabular-nums">{r.hours ?? 0}</td>
+                  <td className="py-2 tabular-nums">{r.grams ?? 0}</td>
+                  <td className="py-2 tabular-nums">
+                    {fmtIDR(r.amountIDR ?? r.amount)}
+                  </td>
+                  <td className="py-2">
+                    <span
+                      className={`rounded-md px-2 py-0.5 text-xs uppercase tracking-wide ring-1 ${
+                        r.status === "approved"
+                          ? "bg-emerald-500/10 text-emerald-200 ring-emerald-400/30"
+                          : r.status === "pending"
+                          ? "bg-amber-500/10 text-amber-200 ring-amber-400/30"
+                          : "bg-rose-500/10 text-rose-200 ring-rose-400/30"
+                      }`}
+                    >
+                      {r.status}
+                    </span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="text-slate-200">
-                {rows.map((r) => {
-                  const dt =
-                    r.createdAt?.toDate?.() instanceof Date
-                      ? r.createdAt.toDate().toLocaleString()
-                      : "-";
-                  const filament =
-                    r.grams > 0
-                      ? `${r.material ?? "-"} ${r.grams}g${r.color ? ` (${r.color})` : ""}`
-                      : "-";
-                  return (
-                    <tr key={r.id} className="border-t border-slate-800">
-                      <td className="py-3 pr-4">{dt}</td>
-                      <td className="py-3 pr-4">{r.hours || "-"}</td>
-                      <td className="py-3 pr-4">{filament}</td>
-                      <td className="py-3 pr-4">{formatIDR(r.amountIDR)}</td>
-                      <td className="py-3 pr-4">
-                        <span
-                          className={
-                            "rounded px-2 py-1 text-xs " +
-                            (r.status === "approved"
-                              ? "bg-green-500/20 text-green-300"
-                              : r.status === "pending"
-                              ? "bg-yellow-500/20 text-yellow-300"
-                              : "bg-red-500/20 text-red-300")
-                          }
-                        >
-                          {r.status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+
+              {!loading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                    No records.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <Pager page={page} total={total} pageSize={PAGE_SIZE} onPageChange={loadPage} />
       </div>
     </div>
   );

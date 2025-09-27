@@ -2,195 +2,247 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAuth } from "../contexts/AuthProvider";
 import { createTopUpRequest, formatIDR } from "../lib/wallet";
+import { useAuth } from "../contexts/AuthProvider";
+import { useNavigate } from "react-router-dom";
 
-/** ----- Pricing presets ----- */
 const HOUR_PACKS = [
   { label: "1 Hour", hours: 1, price: 25_000 },
   { label: "5 Hours", hours: 5, price: 120_000 },
   { label: "10 Hours", hours: 10, price: 200_000 },
-] as const;
+];
 
-const FILAMENT_MATERIALS = [
-  { key: "PLA" as const, label: "PLA", pricePerKg: 170_000 },
-  { key: "TPU" as const, label: "TPU", pricePerKg: 240_000 },
-] as const;
+const MATERIALS: Array<{ material: "PLA" | "TPU"; pricePerKg: number }> = [
+  { material: "PLA", pricePerKg: 170_000 },
+  { material: "TPU", pricePerKg: 240_000 },
+];
+const GRAMS = [100, 500, 1000] as const;
+const COLORS = ["White", "Black", "Gray"] as const;
 
-const FILAMENT_GRAMS = [100, 200, 500, 1000] as const;
-const FILAMENT_COLORS = ["White", "Black", "Gray"] as const;
+type Line = {
+  material: "PLA" | "TPU";
+  grams: typeof GRAMS[number];
+  color: typeof COLORS[number];
+};
 
-/** ----- Page ----- */
 export default function TopUpPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
-  // Hours selection
-  const [hourIndex, setHourIndex] = useState<number>(0); // default to 1 hour
+  // Hours selection — -1 means "none selected"
+  const [hourIdx, setHourIdx] = useState<number>(-1);
 
-  // Filament selection
-  const [addFilament, setAddFilament] = useState(false);
-  const [matIndex, setMatIndex] = useState<number>(0);
-  const [gramIndex, setGramIndex] = useState<number>(0);
-  const [colorIndex, setColorIndex] = useState<number>(0);
-
-  // Misc
+  // Filament lines
+  const [lines, setLines] = useState<Line[]>([]);
   const [note, setNote] = useState("");
 
-  const hourPrice = HOUR_PACKS[hourIndex].price;
+  const hourPrice = hourIdx >= 0 ? HOUR_PACKS[hourIdx].price : 0;
+  const hours = hourIdx >= 0 ? HOUR_PACKS[hourIdx].hours : 0;
 
-  // Filament pricing (include 20% margin)
-  const filamentPrice = useMemo(() => {
-    if (!addFilament) return 0;
-    const material = FILAMENT_MATERIALS[matIndex];
-    const grams = FILAMENT_GRAMS[gramIndex];
-    const base = (material.pricePerKg / 1000) * grams; // price per gram * grams
-    return Math.round(base * 1.2); // +20% margin
-  }, [addFilament, matIndex, gramIndex]);
+  const lineCost = (ln: Line) => {
+    const perKg = MATERIALS.find((m) => m.material === ln.material)?.pricePerKg ?? 0;
+    const base = (perKg / 1000) * ln.grams;
+    return Math.round(base * 1.2); // 20% margin
+  };
 
-  const total = hourPrice + filamentPrice;
+  const itemsPrice = useMemo(
+    () => lines.reduce((sum, ln) => sum + lineCost(ln), 0),
+    [lines]
+  );
+
+  const total = hourPrice + itemsPrice;
+
+  function addLine() {
+    setLines((prev) => [...prev, { material: "PLA", grams: 100, color: "White" }]);
+  }
+  function removeLine(i: number) {
+    setLines((prev) => prev.filter((_, idx) => idx !== i));
+  }
+  function updateLine(i: number, patch: Partial<Line>) {
+    setLines((prev) => prev.map((ln, idx) => (idx === i ? { ...ln, ...patch } : ln)));
+  }
 
   async function submit() {
-    if (!user) {
-      alert("Please sign in first.");
+    if (!user) return;
+    if (hours === 0 && lines.length === 0) {
+      alert("Please select hours or add at least one filament.");
       return;
     }
 
-    const filament = addFilament
-      ? {
-          material: FILAMENT_MATERIALS[matIndex].key,
-          grams: FILAMENT_GRAMS[gramIndex],
-          color: FILAMENT_COLORS[colorIndex],
-        }
-      : undefined;
-
     await createTopUpRequest(user.uid, {
-      userEmail: user.email ?? "",
-      userName: user.displayName ?? "",
-      hours: HOUR_PACKS[hourIndex].hours,
-      filament,
+      userEmail: user.email,
+      userName: user.displayName ?? undefined,
+      hours,
+      items: lines,
       amountIDR: total,
       note,
     });
 
-    alert(
-      "Top-up submitted.\nPlease transfer the amount and wait for admin approval."
-    );
-    setNote("");
+    navigate("/dashboard/payment");
   }
 
+  const card =
+    "rounded-2xl ring-1 ring-white/10 bg-white/5 p-5 backdrop-blur-sm shadow-xl shadow-black/10";
+  const label = "text-sm text-slate-300";
+  const select =
+    "rounded-lg bg-slate-900/60 border border-white/10 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500";
+  const btnSecondary =
+    "px-3 py-2 rounded-lg bg-slate-700/70 hover:bg-slate-600 text-white text-sm transition";
+  const btnPrimary =
+    "px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition";
+
   return (
-    <section className="max-w-6xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-white">Top-Up Wallet</h1>
+    <section className="space-y-6">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-bold text-white">Top-Up Wallet</h1>
+        <p className="text-slate-400 text-sm">
+          Buy print hours or add filament balance to your wallet.
+        </p>
+      </header>
 
       {/* Hours */}
-      <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 p-5">
-        <div className="text-slate-300 mb-3">Hour Balance</div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {HOUR_PACKS.map((p, idx) => {
-            const active = hourIndex === idx;
-            return (
-              <button
-                key={p.label}
-                onClick={() => setHourIndex(idx)}
-                className={`rounded-xl px-4 py-4 text-left transition border ${
-                  active
-                    ? "bg-indigo-600/20 border-indigo-500 text-indigo-200"
-                    : "bg-slate-800/60 border-slate-700 text-slate-200 hover:bg-slate-800"
-                }`}
-              >
-                <div className="font-semibold">{p.label}</div>
-                <div className="text-sm">{formatIDR(p.price)}</div>
-              </button>
-            );
-          })}
+      <div className={card}>
+        <div className="mb-3 flex items-center justify-between">
+          <div className={label}>Hour Balance</div>
+          <button
+            onClick={() => setHourIdx(-1)}
+            className="text-xs text-slate-400 hover:text-white underline"
+          >
+            Clear hours
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {HOUR_PACKS.map((p, i) => (
+            <button
+              key={p.label}
+              onClick={() => setHourIdx(i)}
+              className={`rounded-xl px-4 py-3 text-left ring-1 transition ${
+                hourIdx === i
+                  ? "ring-indigo-400/40 bg-indigo-600/20 text-indigo-100"
+                  : "ring-white/10 bg-slate-900/60 text-slate-200 hover:bg-slate-800/60"
+              }`}
+            >
+              <div className="font-semibold">{p.label}</div>
+              <div className="text-sm">{formatIDR(p.price)}</div>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Add Filament */}
-      <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 p-5 space-y-4">
-        <label className="inline-flex items-center gap-2 text-slate-300">
-          <input
-            type="checkbox"
-            className="accent-indigo-500"
-            checked={addFilament}
-            onChange={(e) => setAddFilament(e.target.checked)}
-          />
-          Add Filament
-        </label>
+      {/* Filament lines */}
+      <div className={`${card} space-y-4`}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-white font-semibold">Add Filament</h3>
+          <button onClick={addLine} className={btnSecondary}>
+            + Add Filament
+          </button>
+        </div>
 
-        {addFilament && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <select
-              value={matIndex}
-              onChange={(e) => setMatIndex(Number(e.target.value))}
-              className="rounded-lg bg-slate-800 text-white p-2 border border-slate-700"
-            >
-              {FILAMENT_MATERIALS.map((m, i) => (
-                <option key={m.key} value={i}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
+        {lines.length === 0 ? (
+          <p className="text-slate-400 text-sm">No filaments added.</p>
+        ) : (
+          <div className="space-y-3">
+            {lines.map((ln, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-1 md:grid-cols-[1fr,1fr,1fr,auto] gap-3 items-center"
+              >
+                <select
+                  className={select}
+                  value={ln.material}
+                  onChange={(e) =>
+                    updateLine(i, { material: e.target.value as Line["material"] })
+                  }
+                >
+                  {MATERIALS.map((m) => (
+                    <option key={m.material} value={m.material}>
+                      {m.material}
+                    </option>
+                  ))}
+                </select>
 
-            <select
-              value={gramIndex}
-              onChange={(e) => setGramIndex(Number(e.target.value))}
-              className="rounded-lg bg-slate-800 text-white p-2 border border-slate-700"
-            >
-              {FILAMENT_GRAMS.map((g, i) => (
-                <option key={g} value={i}>
-                  {g} g
-                </option>
-              ))}
-            </select>
+                <select
+                  className={select}
+                  value={ln.grams}
+                  onChange={(e) =>
+                    updateLine(i, { grams: Number(e.target.value) as Line["grams"] })
+                  }
+                >
+                  {GRAMS.map((g) => (
+                    <option key={g} value={g}>
+                      {g} g
+                    </option>
+                  ))}
+                </select>
 
-            <select
-              value={colorIndex}
-              onChange={(e) => setColorIndex(Number(e.target.value))}
-              className="rounded-lg bg-slate-800 text-white p-2 border border-slate-700"
-            >
-              {FILAMENT_COLORS.map((c, i) => (
-                <option key={c} value={i}>
-                  {c}
-                </option>
-              ))}
-            </select>
+                <select
+                  className={select}
+                  value={ln.color}
+                  onChange={(e) =>
+                    updateLine(i, { color: e.target.value as Line["color"] })
+                  }
+                >
+                  {COLORS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-slate-300 min-w-[100px]">
+                    {formatIDR(lineCost(ln))}
+                  </div>
+                  <button onClick={() => removeLine(i)} className="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Payment & Submit */}
-      <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 p-5 space-y-4">
-        <div className="text-slate-300">Bank Transfer</div>
-        <div className="text-slate-200">
-          BCA : <b>5271041536</b> — A/N <b>Bima Pratama Putra</b>
+      {/* Payment summary */}
+      <div className={`${card} space-y-4`}>
+        <div className="grid gap-2 text-sm text-slate-200">
+          <div className="flex justify-between">
+            <span>Hours</span>
+            <span className="tabular-nums">
+              {hours} {hours === 1 ? "Hour" : "Hours"} {hours ? `— ${formatIDR(hourPrice)}` : ""}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Filament</span>
+            <span className="tabular-nums">{formatIDR(itemsPrice)}</span>
+          </div>
         </div>
 
         <input
+          placeholder="Note (optional)"
+          className="w-full rounded-lg bg-slate-900/60 text-white px-3 py-2 border border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Note (optional)"
-          className="w-full rounded-lg bg-slate-800 text-white p-3 border border-slate-700"
         />
 
         <div className="flex items-center justify-between">
-          <div className="text-slate-300">
-            Total{" "}
-            <span className="text-slate-400 text-sm">
-              (hours {formatIDR(hourPrice)}
-              {addFilament ? ` + filament ${formatIDR(filamentPrice)}` : ""})
-            </span>
-          </div>
-          <div className="text-2xl font-bold text-white">{formatIDR(total)}</div>
+          <div className="text-slate-300">Total</div>
+          <div className="text-xl font-bold text-white">{formatIDR(total)}</div>
         </div>
 
         <button
           onClick={submit}
-          disabled={!user || total <= 0}
-          className="px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+          disabled={total <= 0}
+          className={`${btnPrimary} disabled:opacity-50`}
         >
-          Submit &amp; Pay Manually
+          Submit Top-Up
         </button>
+
+        <p className="text-xs text-slate-400">
+          After submitting, you’ll see payment instructions. Your wallet will be
+          credited once the admin verifies your transfer.
+        </p>
       </div>
     </section>
   );

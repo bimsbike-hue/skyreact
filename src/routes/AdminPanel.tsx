@@ -2,14 +2,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "../contexts/AuthProvider";
 import {
   onPendingTopUps,
   adminApproveTopUp,
   adminRejectTopUp,
   formatIDR,
+  type TopUpRequest,
 } from "../lib/wallet";
-import type { TopUpRequest } from "../lib/wallet";
+import { useAuth } from "../contexts/AuthProvider";
+
+function itemsToText(r: TopUpRequest) {
+  if (!r.items?.length) return "-";
+  return r.items
+    .map((it) => `${it.material} ${it.grams}g (${it.color})`)
+    .join(" + ");
+}
 
 export default function AdminPanel() {
   const { user } = useAuth();
@@ -38,7 +45,9 @@ export default function AdminPanel() {
 
   return (
     <section className="space-y-4 p-6">
-      <h1 className="text-2xl font-bold text-white">Admin Panel — Pending Top-Ups</h1>
+      <h1 className="text-2xl font-bold text-white">
+        Admin Panel — Pending Top-Ups
+      </h1>
       {err && <div className="text-red-400">Error: {err}</div>}
 
       {rows.length === 0 ? (
@@ -60,16 +69,14 @@ export default function AdminPanel() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-slate-800">
-                  <td className="px-4 py-3">{r.createdAt.toLocaleString()}</td>
-                  <td className="px-4 py-3">{r.userEmail || r.userName || r.userId}</td>
-                  <td className="px-4 py-3">{r.hours || 0}</td>
                   <td className="px-4 py-3">
-                    {r.filament?.material
-                      ? `${r.filament.material} ${r.filament.grams ?? 0}g${
-                          r.filament.color ? ` (${r.filament.color})` : ""
-                        }`
-                      : "-"}
+                    {r.createdAt.toLocaleString()}
                   </td>
+                  <td className="px-4 py-3">
+                    {r.userEmail || r.userName || r.userId}
+                  </td>
+                  <td className="px-4 py-3">{r.hours || 0}</td>
+                  <td className="px-4 py-3">{itemsToText(r)}</td>
                   <td className="px-4 py-3">{formatIDR(r.amountIDR)}</td>
                   <td className="px-4 py-3">{r.note || "-"}</td>
                   <td className="px-4 py-3 space-x-2">

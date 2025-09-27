@@ -14,14 +14,20 @@ try {
 
 // Read from env (Vite requires VITE_* keys)
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY!,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN!,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID!,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID!,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID!,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, // optional
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  // optional
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
+
+// Basic validation in dev
+for (const [k, v] of Object.entries(firebaseConfig)) {
+  if (!v) console.warn(`[firebase] Missing env ${k}`);
+}
 
 // Initialize once (prevents duplicate init on HMR)
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
